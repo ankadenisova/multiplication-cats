@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@import "@neondatabase/auth/ui/tailwind";
+
+:root {
+  --bg: #FBF4FF;
+  --fg: #4A3366;
+  --card: #ffffff;
+  --accent: #A98BF0;
+  --accent-deep: #7D62C9;
+  --accent-soft: #F1E8FF;
+  --pink: #FFBED6;
+  --ok: #2E9E6A;
+  --ok-soft: #DDF6E8;
+  --bad: #D9486E;
+  --bad-soft: #FFE3EC;
+  --muted: #8B76A8;
+  --line: #F0E3FA;
+}
+
+html, body {
+  height: 100%;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-nunito), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 17px;
+  font-weight: 600;
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--line) 1px, transparent 1px);
+  background-size: 100% 28px;
+}
+
+/* Album page pieces */
+.polaroid {
+  background: #fff;
+  padding: 14px 14px 18px;
+  box-shadow: 0 8px 20px rgba(74, 51, 102, 0.16);
+  position: relative;
+}
+.tape {
+  position: absolute;
+  width: 74px;
+  height: 22px;
+  background: rgba(255, 190, 214, 0.8);
+  pointer-events: none;
+}
+.btn-main {
+  @apply w-full rounded-2xl py-4 text-xl font-extrabold text-white;
+  background: var(--accent);
+  box-shadow: 0 5px 0 var(--accent-deep);
+  transition: transform 60ms ease, box-shadow 60ms ease;
+}
+.btn-main:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--accent-deep); }
+.btn-main:disabled { opacity: 0.6; }
+.pill {
+  @apply rounded-full bg-white px-3 py-1.5 text-sm font-bold;
+  box-shadow: 0 2px 0 var(--line);
+}
+.slot {
+  @apply flex items-center justify-center rounded-full;
+  border: 2.5px dashed #D6BFF0;
+  background: #ffffffaa;
+}
+
+.key {
+  @apply select-none rounded-2xl text-3xl font-extrabold flex items-center justify-center;
+  background: var(--card);
+  color: var(--fg);
+  height: 64px;
+  box-shadow: 0 4px 0 #E4D3F7;
+  transition: transform 60ms ease, background 60ms ease;
+}
+.key:active { transform: translateY(3px); box-shadow: 0 1px 0 #E4D3F7; background: var(--accent-soft); }
+
+@keyframes pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pop { animation: pop 350ms ease-out; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+.shake { animation: shake 300ms ease; }
+
+@keyframes stick {
+  0% { transform: scale(0.2) rotate(-40deg); opacity: 0; }
+  70% { transform: scale(1.12) rotate(6deg); opacity: 1; }
+  100% { transform: scale(1) rotate(-4deg); }
+}
+.stick { animation: stick 600ms cubic-bezier(.34,1.56,.64,1) both; }
+
+/* Neon Auth UI (shadcn tokens) in album colours */
+:root {
+  --primary: #A98BF0;
+  --primary-foreground: #ffffff;
+  --ring: #A98BF0;
+  --radius: 1rem;
+}
