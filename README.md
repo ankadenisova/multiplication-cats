@@ -1,13 +1,15 @@
-# Котики и умножение
+# Multiplication Cats
 
-Сайт, на котором ребёнок решает примеры на умножение и получает за это наклейки-котики и время на телефон. За сессию из 10 решённых примеров даётся наклейка и 15 минут экранного времени, после 5 сессий в день — только наклейка. Бот в Telegram после каждой засчитанной сессии пишет родителям: «решила примеры, добавьте 15 минут».
+A website where a kid practises the times tables and earns cat stickers and phone time for it. A session is 10 problems; a finished session gives a sticker and 15 minutes of screen time, and after 5 sessions a day only the sticker. After every counted session a Telegram bot tells the parents: "finished a session, add 15 minutes".
 
-Как это появилось: https://t.me/denisova_pt/1367
+How it came about: [origin story, in Russian](https://t.me/denisova_pt/1367).
 
-Основа — приложение Лёши Писаревского ([alexpihq](https://github.com/alexpihq)), выложено с его согласия. Я переделала его в сайт и перерисовала дизайн.
+It is built on an app by Alex Pisarevsky ([alexpihq](https://github.com/alexpihq)), published here with his permission. I turned it into a website and redrew the design.
 
-## Как сделать себе
+## Make your own
 
-Киньте ссылку на этот репозиторий своему агенту (Claude Code, Codex) и скажите, что хотите поменять: имя ребёнка, награды, примеры, дизайн. Понадобятся бесплатные Neon (база) и Vercel (хостинг): агент сам всё настроит и скажет, где войти.
+Give the link to this repository to your coding agent (Claude Code, Codex) and tell it what to change: the kid's name, the rewards, the problems, the design, the language. Two UI languages are built in, English and Russian; switch with `APP_LOCALE` in `.env`. The agent can add any other language the same way (one file in `src/lib/i18n/`).
 
-Настройки — в `.env.example`. Устройство сайта — в [docs/architecture.md](docs/architecture.md).
+You will need free accounts on Neon (database) and Vercel (hosting). The agent sets everything up and tells you where to sign in.
+
+Settings are in `.env.example`. How the site works is in [docs/architecture.md](docs/architecture.md).
