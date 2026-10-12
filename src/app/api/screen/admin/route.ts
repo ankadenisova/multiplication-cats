@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isParent } from "@/lib/parent-auth";
 import { allPolicies, asGroup, decideRequest, grantMinutes, listDevices, listKids, pendingRequests, setLock, setRules, todayGrants, userIdByEmail } from "@/lib/screen";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
   if (!(await isParent(request))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const body = await request.json().catch(() => null);
   if (body?.action === "decide") {
-    const r = await decideRequest(Number(body.requestId), Number(body.minutes ?? 0), "админка");
+    const r = await decideRequest(Number(body.requestId), Number(body.minutes ?? 0), t.telegram.viaAdmin);
     return r ? NextResponse.json(r) : NextResponse.json({ error: "request not found" }, { status: 404 });
   }
   const userId = await resolveUser(body?.user ?? null);

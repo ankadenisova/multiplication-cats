@@ -3,13 +3,13 @@
  *
  * Each card climbs a ladder of stages; every correct answer on a due card moves it
  * one stage up and pushes the next review further away. A wrong answer or
- * "не помню" drops it one stage and brings it back within the same session
+ * "I don't remember" drops it one stage and brings it back within the same session
  * (relearning). Once the relearned card is answered correctly it is due tomorrow.
  */
 
 export const STAGE_INTERVALS_DAYS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16, 6: 30, 7: 60 };
 export const MAX_STAGE = 7;
-/** stage >= LEARNED_STAGE counts as "выучено" (interval 8+ days). */
+/** stage >= LEARNED_STAGE counts as "learned" (interval 8+ days). */
 export const LEARNED_STAGE = 4;
 /** How soon a failed card comes back within the session. */
 export const RELEARN_DELAY_MS = 90_000;

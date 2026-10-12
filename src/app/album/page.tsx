@@ -4,6 +4,7 @@ import { currentUser } from "@/lib/auth/server";
 import { sql } from "@/db";
 import { STICKER_COUNT, sticker } from "@/lib/stickers";
 import CatSticker from "../components/CatSticker";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,12 @@ export default async function AlbumPage() {
   return (
     <main className="mx-auto w-full max-w-md px-4 pb-10">
       <header className="flex items-center justify-between py-4">
-        <Link href="/" className="pill">← Учить</Link>
-        <h1 className="text-xl font-black">Альбом {user.name}</h1>
+        <Link href="/" className="pill">{t.nav.back}</Link>
+        <h1 className="text-xl font-black">{t.album.title(user.name)}</h1>
       </header>
 
       <p className="mb-5 text-center text-[var(--muted)]">
-        Собрано {unique} из {STICKER_COUNT}. За каждую засчитанную сессию новый котик
+        {t.album.collected(unique, STICKER_COUNT)}
       </p>
 
       <section className="polaroid grid grid-cols-3 gap-x-2 gap-y-5 rotate-[0.6deg]">
@@ -43,7 +44,7 @@ export default async function AlbumPage() {
               ) : (
                 <div className="slot h-[84px] w-[84px] text-2xl font-black text-[#D6BFF0]">?</div>
               )}
-              <div className="text-xs font-bold leading-tight text-[var(--muted)]">{n > 0 ? s.name : "ещё не найден"}</div>
+              <div className="text-xs font-bold leading-tight text-[var(--muted)]">{n > 0 ? s.name : t.album.notFound}</div>
             </div>
           );
         })}

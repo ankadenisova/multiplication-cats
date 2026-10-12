@@ -2,6 +2,7 @@ import { sql, APP_TZ } from "@/db";
 import { hintFor } from "@/lib/hints";
 import { applyAnswer, overdueRatio, LEARNED_STAGE, NEW_PER_DAY, RELEARN_DELAY_MS, SESSION_SIZE, type AnswerResult } from "@/lib/srs";
 import { getPolicy, grantSessionReward, notifySessionFinished } from "@/lib/screen";
+import { t } from "@/lib/i18n";
 
 type Row = {
   id: number; kind: string; a: number; b: number; answer: number;
@@ -32,7 +33,7 @@ export type HomeInfo = {
 const DAY = 86_400_000;
 /** A session is counted only with at least this many correct answers… */
 export const MIN_CORRECT = 4;
-/** …and fewer than this many "не помню". */
+/** …and fewer than this many "I don't remember". */
 export const MAX_DONT_KNOW = 7;
 
 function localDate(d: Date | string): string {
@@ -250,7 +251,7 @@ export async function recordAnswer(userId: string, input: AnswerInput) {
   const sessionInfo: SessionInfo = { id: Number(session.id), size: session.size, answered, correct: correctTotal, finished };
 
   // A finished session counts only if the child really tried:
-  // at least MIN_CORRECT correct answers and fewer than MAX_DONT_KNOW "не помню".
+  // at least MIN_CORRECT correct answers and fewer than MAX_DONT_KNOW "I don't remember".
   let failReason: "dontknow" | "fewcorrect" | null = null;
   if (finished) {
     const [{ cnt }] = (await sql`
@@ -274,7 +275,7 @@ export async function recordAnswer(userId: string, input: AnswerInput) {
     correct,
     answer: expected,
     hint: correct ? null
-      : isDiv ? `${input.shownA * input.shownB} ÷ ${divisor} = ${expected}, потому что ${divisor} × ${expected} = ${input.shownA * input.shownB}`
+      : isDiv ? t.hints.divAnswer(input.shownA * input.shownB, divisor, expected)
       : isMissing ? `${input.shownA} × ${input.shownB} = ${input.shownA * input.shownB}` : hintFor(input.shownA, input.shownB),
     stage: next.stage,
     comeBackInSec: correct ? null : Math.round(RELEARN_DELAY_MS / 1000),

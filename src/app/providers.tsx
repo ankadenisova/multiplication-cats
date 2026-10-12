@@ -3,7 +3,7 @@
 import { NeonAuthUIProvider } from "@neondatabase/auth/react/ui";
 import Link from "next/link";
 import { authClient } from "@/lib/auth/client";
-import { ruAuth } from "@/lib/auth/localization";
+import { authLocalization } from "@/lib/auth/localization";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -14,7 +14,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       replace={(href) => window.location.replace(href)}
       redirectTo="/"
       credentials={{ forgotPassword: true, rememberMe: true }}
-      localization={ruAuth}
+      localization={authLocalization}
       defaultTheme="light"
       Link={({ href, ...props }) => <Link href={href!} {...props} />}
     >

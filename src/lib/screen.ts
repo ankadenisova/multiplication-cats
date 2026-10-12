@@ -2,12 +2,13 @@ import { createHash, randomBytes, randomInt } from "node:crypto";
 import { sql, APP_TZ } from "@/db";
 import { apnsConfigured, sendSilentPush } from "@/lib/apns";
 import { editParentMessage, sendToParent, telegramConfigured } from "@/lib/telegram";
+import { t } from "@/lib/i18n";
 
 /** App groups with independent budgets. Shield selections live on the phone; budgets live here. */
 export type GroupKey = "default" | "social";
 export const GROUPS: Record<GroupKey, { name: string; base: number; rewards: number[] }> = {
-  default: { name: "Все приложения", base: 0, rewards: [15, 15, 15, 15, 15] },
-  social: { name: "Мессенджеры", base: 40, rewards: [] },
+  default: { name: t.groups.default, base: 0, rewards: [15, 15, 15, 15, 15] },
+  social: { name: t.groups.social, base: 40, rewards: [] },
 };
 export const GROUP_KEYS = Object.keys(GROUPS) as GroupKey[];
 export function asGroup(v: unknown): GroupKey { return v === "social" ? "social" : "default"; }
@@ -277,12 +278,12 @@ export async function getScreenStats(userId: string, policy: Policy): Promise<Sc
 export async function notifySessionFinished(userId: string, s: { correct: number; size: number; failReason: "dontknow" | "fewcorrect" | null; rewardMinutes: number }) {
   if (!telegramConfigured()) return;
   const [u] = await sql`SELECT name FROM neon_auth."user" WHERE id::text = ${userId}`;
-  const name = u?.name ?? "Ребёнок";
+  const name = u?.name ?? t.telegram.childFallback;
   const p = await getPolicy(userId, "default");
   const head = s.failReason
-    ? `⚠️ <b>${name}</b> закончила сессию, но она не засчитана (${s.failReason === "dontknow" ? "слишком много «не помню»" : "мало правильных ответов"}): ${s.correct} из ${s.size}.`
-    : `✅ <b>${name}</b> решила сессию: ${s.correct} из ${s.size} верно.${s.rewardMinutes > 0 ? ` +${s.rewardMinutes} мин.` : " Минут за неё уже не положено: дневной лимит наград исчерпан."}`;
-  await sendToParent(`${head}\nСегодня засчитано сессий: ${p.sessionsRewardedToday}, заработано ${p.earnedTodayMinutes} мин.`);
+    ? t.telegram.sessionNotCounted(name, s.failReason === "dontknow" ? t.telegram.reasonDontKnow : t.telegram.reasonFewCorrect, s.correct, s.size)
+    : t.telegram.sessionDone(name, s.correct, s.size, s.rewardMinutes);
+  await sendToParent(`${head}\n${t.telegram.todaySummary(p.sessionsRewardedToday, p.earnedTodayMinutes)}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -293,18 +294,18 @@ export type ScreenRequest = { id: number; user_id: string; group_key: GroupKey; 
 
 export async function requestMoreTime(userId: string, deviceId: string | null, minutes: number, group: GroupKey = "default"): Promise<{ ok: true; request: ScreenRequest } | { ok: false; error: string }> {
   const [pending] = (await sql`SELECT id, created_at FROM screen_requests WHERE user_id = ${userId} AND group_key = ${group} AND status = 'pending' AND created_at > now() - interval '15 minutes' ORDER BY created_at DESC LIMIT 1`) as { id: number }[];
-  if (pending) return { ok: false, error: "Запрос уже отправлен, подожди ответа" };
+  if (pending) return { ok: false, error: t.telegram.requestPending };
   const [u] = await sql`SELECT name FROM neon_auth."user" WHERE id::text = ${userId}`;
-  const name = u?.name ?? "Ребёнок";
+  const name = u?.name ?? t.telegram.childFallback;
   const p = await getPolicy(userId, group);
   const [req] = (await sql`INSERT INTO screen_requests (user_id, group_key, device_id, minutes) VALUES (${userId}, ${group}, ${deviceId}, ${minutes}) RETURNING id, user_id, group_key, minutes, status, granted_min, tg_message, created_at`) as ScreenRequest[];
   if (telegramConfigured()) {
-    const what = group === "social" ? "на мессенджеры (Telegram, WhatsApp)" : "экранного времени";
-    const text = `📱 <b>${name}</b> просит ещё <b>${minutes} мин</b> ${what}.\nСегодня в этой группе: использовано ${p.usedTodayMinutes} мин, осталось ${p.balanceMinutes} мин${group === "default" ? `, сессий сделано ${p.sessionsRewardedToday}` : ""}.`;
+    const what = group === "social" ? t.telegram.whatSocial : t.telegram.whatScreen;
+    const text = t.telegram.asksMore(name, minutes, what, p.usedTodayMinutes, p.balanceMinutes, group === "default" ? p.sessionsRewardedToday : null);
     const msgId = await sendToParent(text, [[
       { text: `✅ +${minutes}`, callback_data: `req:${req.id}:${minutes}` },
       { text: "✅ +30", callback_data: `req:${req.id}:30` },
-      { text: "❌ Нет", callback_data: `req:${req.id}:0` },
+      { text: t.telegram.buttonNo, callback_data: `req:${req.id}:0` },
     ]]);
     if (msgId) await sql`UPDATE screen_requests SET tg_message = ${msgId} WHERE id = ${req.id}`;
   }
@@ -324,8 +325,8 @@ export async function decideRequest(requestId: number, minutes: number, via: str
   if (granted > 0) p = await grantMinutes(req.user_id, granted, "parent", undefined, req.group_key); else await notifyDevices(req.user_id);
   if (req.tg_message) {
     await editParentMessage(req.tg_message, granted > 0
-      ? `✅ ${name}: выдано <b>+${granted} мин</b> ${req.group_key === "social" ? "на мессенджеры " : ""}(${via}). Осталось на сегодня: ${p?.balanceMinutes ?? "?"} мин.`
-      : `❌ ${name}: запрос на ${req.minutes} мин отклонён (${via}).`);
+      ? t.telegram.grantedMessage(name, granted, req.group_key === "social", via, String(p?.balanceMinutes ?? "?"))
+      : t.telegram.deniedMessage(name, req.minutes, via));
   }
   const [fresh] = (await sql`SELECT id, user_id, group_key, minutes, status, granted_min, tg_message, created_at FROM screen_requests WHERE id = ${requestId}`) as ScreenRequest[];
   return { request: fresh, name };
@@ -335,7 +336,7 @@ export async function pendingRequests(userId: string): Promise<ScreenRequest[]> 
   return (await sql`SELECT id, user_id, group_key, minutes, status, granted_min, tg_message, created_at FROM screen_requests WHERE user_id = ${userId} AND status = 'pending' ORDER BY created_at DESC`) as ScreenRequest[];
 }
 
-/** Latest decided request within the last hour — so the phone can show "папа выдал 30 минут". */
+/** Latest decided request within the last hour — so the phone can show "Dad granted 30 minutes". */
 export async function latestDecision(userId: string): Promise<ScreenRequest | null> {
   const [r] = (await sql`SELECT id, user_id, group_key, minutes, status, granted_min, tg_message, created_at FROM screen_requests WHERE user_id = ${userId} AND status <> 'pending' AND decided_at > now() - interval '1 hour' ORDER BY decided_at DESC LIMIT 1`) as ScreenRequest[];
   return r ?? null;
