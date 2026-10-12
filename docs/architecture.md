@@ -1,14 +1,8 @@
-# StudyApp — times tables + screen time
+# Multiplication Cats — how it works
 
-> This is a working copy for development. The production server and its deployment live in a separate private
-> repository, so there is no deploy workflow and no secrets here: feel free to experiment.
-> The owner moves changes from here to production by hand.
+A kid solves "6 × 8 = ?" cards in the web app. A finished session gives a cat sticker and minutes of screen time, and a Telegram bot tells the parents how much to add. The parent sees everything in the admin page and can add or take away time.
 
-A kid solves "6 × 8 = ?" cards in the web app. Finished sessions give them minutes of screen time.
-The phone app blocks the chosen apps while there are no minutes left and counts how much the kid has actually used.
-The parent sees everything in the admin page and can add or take away time.
-
-There is an iOS client today. There is no Android client, and that is a good entry point for a contributor: the server and the protocol are ready, see "How to build an Android client".
+This repository is the website and its API only. The original app by Alex Pisarevsky also has an iOS client that enforces the screen time on the phone; it is not included here, so screen time is handed out by the parents by hand (that is what the Telegram bot is for). The phone API is kept, so a phone client can be added later.
 
 ## What it consists of (all in this repository)
 
@@ -19,12 +13,11 @@ There is an iOS client today. There is no Android client, and that is a good ent
 | Screen-time logic | `src/lib/screen.ts` | App groups, daily budget, session rewards, "more time" requests, device pairing |
 | HTTP API | `src/app/api/**/route.ts` | For the web (`/api/study/*`) and for the phone (`/api/screen/*`) |
 | Database | `src/db/migrations/*.sql` | Postgres (Neon). Applied in order: `npm run db:migrate` |
-| iOS client | `ios/` | SwiftUI + Screen Time API. Details in `ios/README.md` |
-| Deployment | `deploy/` | Example server configs (systemd, nginx). No auto-deploy in this copy |
+| Telegram bot | `src/app/api/telegram/webhook/route.ts`, `src/lib/telegram.ts` | Session notifications and "more time" requests in the parents' group |
 | Utilities | `scripts/` | `migrate.ts`, `screen.sh` (screen-time control from the terminal) |
 
 Stack: Next.js 16 (App Router, standalone), React 19, Tailwind 4, Neon Postgres via `@neondatabase/serverless`, no ORM.
-Authentication via Neon Auth (managed Better Auth). Swift 5, iOS 17.4+, XcodeGen.
+Authentication via Neon Auth (managed Better Auth).
 
 ## How it works
 
@@ -53,7 +46,7 @@ Group rules are defined in `GROUPS` (`src/lib/screen.ts`) and in the `screen_pol
 - **"Ask for more"** appears for the kid only when the limit is used up and today's sessions are exhausted. The request goes to the parent in Telegram with "✅ +15 / +30 / ❌" buttons (`screen_requests`).
 - **The parent** sees and changes everything in `/admin`, in parent mode on the phone (via the `PARENT_PIN` code) and through `scripts/screen.sh`.
 
-## API for the phone client
+## API for a phone client (optional)
 
 Authorization: `Authorization: Bearer <device token>`. The token is issued once, at pairing.
 
@@ -69,22 +62,13 @@ Authorization: `Authorization: Bearer <device token>`. The token is issued once,
 
 The server computes the `default` group's usage as `all − allowed − social`. This is done because iOS cannot exclude apps from the counter. On Android it is probably easier to count per app and send the same thing.
 
-## How to build an Android client
+## Building a phone client
 
-The server and the protocol do not need to change; what is needed is a client that fulfils the same contract:
-
-1. Pairing with a 6-digit code (`/api/screen/pair`), the token stored in encrypted storage.
-2. A WebView with the study site. When a session is over, the page calls `window.webkit.messageHandlers.studyapp.postMessage({event: "sessionFinished"})`. On Android it is convenient to expose a JS interface with the same object and re-read the policy after this event.
-3. Usage accounting per bucket: `UsageStatsManager` / `UsageEvents`. Buckets: everything, always allowed, messengers.
-4. Blocking: an overlay screen on top of the blocked app via `AccessibilityService` or Device Owner mode. The choice is up to the author of the Android client, each has its trade-offs.
-5. Choosing apps for the buckets happens on the phone in parent mode (via `PARENT_PIN`). As on iOS, these are local device settings and are not sent to the server.
-6. Policy refresh: when the app opens, periodically (WorkManager) and on push, if you add it. For FCM the server needs an equivalent of `src/lib/apns.ts`.
-
-To start, you can lean on the iOS code: `ios/Sources/App/AppModel.swift` (policy and limits), `ios/Sources/Shared/SharedStore.swift` (local counters), `ios/Sources/Monitor` (background accounting).
+The original iOS client (Swift, Screen Time API) lives in Alex's repository, not here. If you want a phone app that blocks apps until the minutes are earned, the server contract above is all it needs: pair with a 6-digit code, open the study site in a WebView, report usage per bucket, and block apps locally. On Android that means `UsageStatsManager` for accounting and an overlay via `AccessibilityService` or Device Owner mode for blocking.
 
 ## Running your own
 
-The site and API address are currently hard-coded to `study.alexpihq.com` (for example `ios/Sources/App/API.swift`). For your own instance you need your own domain, database and `.env`.
+You need your own database and `.env`; the site address comes from `APP_URL`.
 
 ```bash
 npm install
@@ -99,6 +83,6 @@ Registration is currently open: kids can be registered through the site.
 ## Contributing
 
 - Branches and pull requests as you like. Pushing to this repository deploys nothing.
-- Before a PR: `npx tsc --noEmit`, `npm run build`. For iOS: `cd ios && xcodegen generate` and build in Xcode.
+- Before a PR: `npx tsc --noEmit`, `npm run build`.
 - A new table or column goes into a new file in `src/db/migrations/` with the next number. Do not edit old migrations.
 - Any new field in the JSON for the phone must be optional: older builds on phones must survive it.
