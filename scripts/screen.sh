@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Parent CLI for screen-time control. Reads SCREEN_ADMIN_KEY from .env.prod next to this repo.
-# Usage (G=social перед командой — группа мессенджеров, по умолчанию все приложения):
+# Usage (prefix a command with G=social for the messengers group; default is all apps):
 #   scripts/screen.sh status [<short name>|email]
-#   scripts/screen.sh grant  masha 30            # +30 к балансу на сегодня
+#   scripts/screen.sh grant  masha 30            # +30 to today's balance
 #   scripts/screen.sh lock   sasha  /  unlock sasha
 #   scripts/screen.sh set    masha 0 30,10,10    # baseDaily rewards(1st,2nd,3rd session)
-#   scripts/screen.sh device masha "iPhone Маши"  # new pairing code
+#   scripts/screen.sh device masha "Masha's iPhone"  # new pairing code
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 K="${SCREEN_ADMIN_KEY:-$(grep '^SCREEN_ADMIN_KEY=' "$DIR/.env.prod" | cut -d'"' -f2)}"
-BASE="${STUDY_URL:-https://study.alexpihq.com}"
+BASE="${STUDY_URL:-${APP_URL:-http://localhost:3000}}"
 GROUP="${G:-default}"
 # Short names → emails live in scripts/kids.local (gitignored), lines like: masha=kid@example.com
 user() {
