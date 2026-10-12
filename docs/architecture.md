@@ -1,104 +1,104 @@
-# StudyApp — таблица умножения + экранное время
+# StudyApp — times tables + screen time
 
-> Это рабочая копия для разработки. Прод-сервер и его деплой живут в отдельном закрытом репозитории,
-> поэтому здесь нет workflow деплоя и секретов: можно спокойно экспериментировать.
-> Изменения отсюда владелец переносит в прод вручную.
+> This is a working copy for development. The production server and its deployment live in a separate private
+> repository, so there is no deploy workflow and no secrets here: feel free to experiment.
+> The owner moves changes from here to production by hand.
 
-Ребёнок решает карточки «6 × 8 = ?» в веб-приложении. Законченные сессии дают ему минуты экранного времени.
-Телефонное приложение блокирует выбранные приложения, пока минут нет, и считает, сколько ребёнок реально потратил.
-Родитель видит всё в админке и может добавлять или забирать время.
+A kid solves "6 × 8 = ?" cards in the web app. Finished sessions give them minutes of screen time.
+The phone app blocks the chosen apps while there are no minutes left and counts how much the kid has actually used.
+The parent sees everything in the admin page and can add or take away time.
 
-Сейчас есть iOS-клиент. Android-клиента нет, и это хорошая точка входа для контрибьютора: сервер и протокол уже готовы, см. раздел «Как сделать Android-клиент».
+There is an iOS client today. There is no Android client, and that is a good entry point for a contributor: the server and the protocol are ready, see "How to build an Android client".
 
-## Из чего состоит (всё в этом репозитории)
+## What it consists of (all in this repository)
 
-| Часть | Где | Что делает |
+| Part | Where | What it does |
 |---|---|---|
-| Веб-приложение | `src/app` | Учёба (карточки, сессии), прогресс ребёнка, админка родителя `/admin` |
-| Логика учёбы | `src/lib/study.ts`, `src/lib/srs.ts`, `src/lib/hints.ts` | Выбор карточек, интервальные повторения, подсказки, правила засчитывания сессии |
-| Логика экранного времени | `src/lib/screen.ts` | Группы приложений, дневной бюджет, награды за сессии, запросы «ещё время», привязка устройств |
-| HTTP API | `src/app/api/**/route.ts` | Для веба (`/api/study/*`) и для телефона (`/api/screen/*`) |
-| База | `src/db/migrations/*.sql` | Postgres (Neon). Применяются по порядку: `npm run db:migrate` |
-| iOS-клиент | `ios/` | SwiftUI + Screen Time API. Подробно в `ios/README.md` |
-| Деплой | `deploy/` | Пример конфигов сервера (systemd, nginx). Автодеплоя в этой копии нет |
-| Утилиты | `scripts/` | `migrate.ts`, `screen.sh` (управление экранным временем из терминала) |
+| Web app | `src/app` | Study (cards, sessions), the kid's progress, the parent admin page `/admin` |
+| Study logic | `src/lib/study.ts`, `src/lib/srs.ts`, `src/lib/hints.ts` | Card selection, spaced repetition, hints, rules for counting a session |
+| Screen-time logic | `src/lib/screen.ts` | App groups, daily budget, session rewards, "more time" requests, device pairing |
+| HTTP API | `src/app/api/**/route.ts` | For the web (`/api/study/*`) and for the phone (`/api/screen/*`) |
+| Database | `src/db/migrations/*.sql` | Postgres (Neon). Applied in order: `npm run db:migrate` |
+| iOS client | `ios/` | SwiftUI + Screen Time API. Details in `ios/README.md` |
+| Deployment | `deploy/` | Example server configs (systemd, nginx). No auto-deploy in this copy |
+| Utilities | `scripts/` | `migrate.ts`, `screen.sh` (screen-time control from the terminal) |
 
-Стек: Next.js 16 (App Router, standalone), React 19, Tailwind 4, Neon Postgres через `@neondatabase/serverless`, без ORM.
-Авторизация через Neon Auth (managed Better Auth). Swift 5, iOS 17.4+, XcodeGen.
+Stack: Next.js 16 (App Router, standalone), React 19, Tailwind 4, Neon Postgres via `@neondatabase/serverless`, no ORM.
+Authentication via Neon Auth (managed Better Auth). Swift 5, iOS 17.4+, XcodeGen.
 
-## Как это работает
+## How it works
 
-### Учёба
+### Study
 
-- Карточки: все пары 2…9 × 2…9, по одной на неупорядоченную пару (3×7 = 7×3, порядок показа случайный). Таблица `cards`, поле `kind`: `mul`, а также `missing` («… × 6 = 36», включается для ребёнка в `user_settings`). Флаг `active` выключает карточку совсем.
-- Повторения: ступени 1…7 с интервалами 1/2/4/8/16/30/60 дней (`src/lib/srs.ts`). Ошибка опускает карточку на ступень и возвращает её через 90 секунд. Ступень 4 и выше означает «выучено».
-- Сессия: 10 карточек. Она засчитывается, только если в ней минимум 4 правильных ответа и меньше 7 «не помню» (`MIN_CORRECT`, `MAX_DONT_KNOW`). Ребёнку порог не показывается.
-- «Не помню» работает в два шага: сначала подсказка, как посчитать, без ответа; потом «Всё равно не помню», и показывается ответ. Обе кнопки 5 секунд неактивны.
-- Каждый ответ пишется в `reviews`, состояние карточки хранится в `user_cards`, сессии в `sessions`.
+- Cards: every pair 2…9 × 2…9, one per unordered pair (3×7 = 7×3, shown in random order). Table `cards`, column `kind`: `mul`, plus `missing` ("… × 6 = 36", switched on per kid in `user_settings`). The `active` flag turns a card off completely.
+- Repetition: stages 1…7 with intervals of 1/2/4/8/16/30/60 days (`src/lib/srs.ts`). A mistake drops the card one stage and brings it back after 90 seconds. Stage 4 and above means "learned".
+- Session: 10 cards. It counts only with at least 4 correct answers and fewer than 7 "I don't remember" (`MIN_CORRECT`, `MAX_DONT_KNOW`). The kid is not shown the threshold.
+- "I don't remember" works in two steps: first a hint on how to work it out, without the answer; then "I still don't remember", and the answer is shown. Both buttons are inactive for 5 seconds.
+- Every answer is written to `reviews`, card state lives in `user_cards`, sessions in `sessions`.
 
-### Экранное время
+### Screen time
 
-Три корзины приложений (ребёнок не видит их внутреннее устройство):
+Three buckets of apps (the kid does not see how they work inside):
 
-| Группа | Ключ | Бюджет |
+| Group | Key | Budget |
 |---|---|---|
-| Всегда разрешено (звонки, сообщения, камера, карты, само приложение учёбы) | не блокируется | без лимита |
-| Мессенджеры | `social` | 40 минут в день, сессии не влияют |
-| Всё остальное (игры, видео…) | `default` | 0 минут + награды за сессии: 30, потом 10, потом 10 |
+| Always allowed (calls, messages, camera, maps, the study app itself) | not blocked | no limit |
+| Messengers | `social` | 40 minutes a day, sessions have no effect |
+| Everything else (games, video…) | `default` | 0 minutes + session rewards: 30, then 10, then 10 |
 
-Правила групп задаются в `GROUPS` (`src/lib/screen.ts`) и в таблице `screen_policies`, на каждого ребёнка и каждую группу.
+Group rules are defined in `GROUPS` (`src/lib/screen.ts`) and in the `screen_policies` table, per kid and per group.
 
-- **Бюджет на день** = база + начисления за сессии + выдачи родителя (`screen_grants`). В полночь по Europe/Lisbon всё начинается заново.
-- **Использование считает телефон**: сколько минут с полуночи ребёнок провёл в приложениях каждой корзины. Телефон шлёт это на сервер (`screen_usage`) и сам ставит блокировку, когда использованное достигает бюджета. Сервер в момент блокировки не нужен, поэтому отставание сети не даёт «пересидеть» лимит.
-- **«Попросить ещё»** появляется у ребёнка, только когда лимит кончился и сессии на сегодня исчерпаны. Запрос уходит родителю в Telegram с кнопками «✅ +15 / +30 / ❌» (`screen_requests`).
-- **Родитель** видит и меняет всё в `/admin`, в родительском режиме на телефоне (по коду `PARENT_PIN`) и через `scripts/screen.sh`.
+- **Daily budget** = base + session credits + parent grants (`screen_grants`). At midnight Europe/Lisbon everything starts over.
+- **The phone counts usage**: how many minutes since midnight the kid spent in the apps of each bucket. The phone sends it to the server (`screen_usage`) and applies the block itself when usage reaches the budget. The server is not needed at the moment of blocking, so network lag cannot be used to "sit out" the limit.
+- **"Ask for more"** appears for the kid only when the limit is used up and today's sessions are exhausted. The request goes to the parent in Telegram with "✅ +15 / +30 / ❌" buttons (`screen_requests`).
+- **The parent** sees and changes everything in `/admin`, in parent mode on the phone (via the `PARENT_PIN` code) and through `scripts/screen.sh`.
 
-## API для телефонного клиента
+## API for the phone client
 
-Авторизация: `Authorization: Bearer <device token>`. Токен выдаётся один раз при привязке.
+Authorization: `Authorization: Bearer <device token>`. The token is issued once, at pairing.
 
-| Метод | Путь | Тело / ответ |
+| Method | Path | Body / response |
 |---|---|---|
-| POST | `/api/screen/pair` | `{code, appVersion}` → `{token, device, user}`. Код из 6 цифр родитель берёт в `/admin` |
-| GET | `/api/screen/policy` | → политика группы `default` на верхнем уровне + `groups: {default, social}`, у каждой есть `budgetTodayMinutes`, `usedTodayMinutes`, `balanceMinutes`, `nextSessionReward`, `lockedOverride`; плюс `parentCode` |
-| POST | `/api/screen/usage` | `{bucket: "all" \| "allowed" \| "social", used}` — минуты с полуночи (абсолютное значение, сервер хранит максимум) |
-| POST | `/api/screen/request` | `{group, minutes}` — попросить ещё времени. `GET` возвращает статус последнего запроса |
-| POST | `/api/screen/parent-grant` | `{pin, group, minutes}` — выдача из родительского режима |
-| POST | `/api/screen/apns` | `{token}` — токен пушей (сейчас только Apple) |
-| POST | `/api/screen/log` | `{source, lines: []}` — отладочный журнал устройства (таблица `device_log`) |
+| POST | `/api/screen/pair` | `{code, appVersion}` → `{token, device, user}`. The parent gets the 6-digit code in `/admin` |
+| GET | `/api/screen/policy` | → the `default` group's policy at the top level + `groups: {default, social}`, each with `budgetTodayMinutes`, `usedTodayMinutes`, `balanceMinutes`, `nextSessionReward`, `lockedOverride`; plus `parentCode` |
+| POST | `/api/screen/usage` | `{bucket: "all" \| "allowed" \| "social", used}` — minutes since midnight (absolute value, the server keeps the maximum) |
+| POST | `/api/screen/request` | `{group, minutes}` — ask for more time. `GET` returns the status of the latest request |
+| POST | `/api/screen/parent-grant` | `{pin, group, minutes}` — a grant from parent mode |
+| POST | `/api/screen/apns` | `{token}` — push token (Apple only for now) |
+| POST | `/api/screen/log` | `{source, lines: []}` — device debug log (table `device_log`) |
 
-Использование группы `default` сервер считает как `all − allowed − social`. Так сделано потому, что iOS не умеет исключать приложения из счётчика. На Android, скорее всего, удобнее считать по каждому приложению и слать то же самое.
+The server computes the `default` group's usage as `all − allowed − social`. This is done because iOS cannot exclude apps from the counter. On Android it is probably easier to count per app and send the same thing.
 
-## Как сделать Android-клиент
+## How to build an Android client
 
-Сервер и протокол менять не нужно, нужен клиент, который выполняет тот же контракт:
+The server and the protocol do not need to change; what is needed is a client that fulfils the same contract:
 
-1. Привязка по коду из 6 цифр (`/api/screen/pair`), токен хранить в зашифрованном хранилище.
-2. WebView с сайтом учёбы. Когда сессия закончена, страница вызывает `window.webkit.messageHandlers.studyapp.postMessage({event: "sessionFinished"})`. На Android удобно сделать JS-интерфейс с тем же объектом, и после этого события перечитывать политику.
-3. Учёт использования по корзинам: `UsageStatsManager` / `UsageEvents`. Корзины: всё, всегда разрешённые, мессенджеры.
-4. Блокировка: экран поверх заблокированного приложения через `AccessibilityService` или режим Device Owner. Решение за автором Android-клиента, у каждого свои компромиссы.
-5. Выбор приложений для корзин делается на телефоне в родительском режиме (по `PARENT_PIN`). Как и на iOS, это локальные настройки устройства, на сервер они не передаются.
-6. Обновление политики: при открытии приложения, периодически (WorkManager) и по пушу, если его добавить. Под FCM на сервере нужен аналог `src/lib/apns.ts`.
+1. Pairing with a 6-digit code (`/api/screen/pair`), the token stored in encrypted storage.
+2. A WebView with the study site. When a session is over, the page calls `window.webkit.messageHandlers.studyapp.postMessage({event: "sessionFinished"})`. On Android it is convenient to expose a JS interface with the same object and re-read the policy after this event.
+3. Usage accounting per bucket: `UsageStatsManager` / `UsageEvents`. Buckets: everything, always allowed, messengers.
+4. Blocking: an overlay screen on top of the blocked app via `AccessibilityService` or Device Owner mode. The choice is up to the author of the Android client, each has its trade-offs.
+5. Choosing apps for the buckets happens on the phone in parent mode (via `PARENT_PIN`). As on iOS, these are local device settings and are not sent to the server.
+6. Policy refresh: when the app opens, periodically (WorkManager) and on push, if you add it. For FCM the server needs an equivalent of `src/lib/apns.ts`.
 
-Для начала можно опираться на iOS-код: `ios/Sources/App/AppModel.swift` (политика и лимиты), `ios/Sources/Shared/SharedStore.swift` (локальные счётчики), `ios/Sources/Monitor` (фоновый учёт).
+To start, you can lean on the iOS code: `ios/Sources/App/AppModel.swift` (policy and limits), `ios/Sources/Shared/SharedStore.swift` (local counters), `ios/Sources/Monitor` (background accounting).
 
-## Запустить у себя
+## Running your own
 
-Сайт и адрес API сейчас захардкожены на `study.alexpihq.com` (например, `ios/Sources/App/API.swift`). Для своего экземпляра понадобится свой домен, база и `.env`.
+The site and API address are currently hard-coded to `study.alexpihq.com` (for example `ios/Sources/App/API.swift`). For your own instance you need your own domain, database and `.env`.
 
 ```bash
 npm install
-cp .env.example .env.local      # заполнить
+cp .env.example .env.local      # fill it in
 npm run db:migrate
 npm run dev                     # http://localhost:3000
 ```
 
-Neon: создать проект, включить Neon Auth на ветке, добавить свой домен в доверенные (trusted domains).
-Регистрация сейчас открыта: детей можно зарегистрировать через сайт.
+Neon: create a project, enable Neon Auth on the branch, add your domain to the trusted domains.
+Registration is currently open: kids can be registered through the site.
 
-## Как контрибьютить
+## Contributing
 
-- Ветки и pull request'ы — как удобно. Push в этот репозиторий ничего не деплоит.
-- Перед PR: `npx tsc --noEmit`, `npm run build`. Для iOS: `cd ios && xcodegen generate` и сборка в Xcode.
-- Новая таблица или колонка оформляется новым файлом в `src/db/migrations/` со следующим номером. Старые миграции не править.
-- Любое новое поле в JSON для телефона делать необязательным: старые сборки на телефонах должны его переживать.
+- Branches and pull requests as you like. Pushing to this repository deploys nothing.
+- Before a PR: `npx tsc --noEmit`, `npm run build`. For iOS: `cd ios && xcodegen generate` and build in Xcode.
+- A new table or column goes into a new file in `src/db/migrations/` with the next number. Do not edit old migrations.
+- Any new field in the JSON for the phone must be optional: older builds on phones must survive it.
